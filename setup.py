@@ -13,6 +13,8 @@ config = {
     'install_requires': [
         'mwclient',
         'mwparserfromhell',
+        'tld',
+        'unidecode',
     ],
     'packages': find_packages(),
     'scripts': ['inq'],

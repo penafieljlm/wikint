@@ -1,11 +1,10 @@
 import mwclient
-import wikint.page
+import wikint.core.page
 
 class Site:
 
-	def __init__(self, site):
-		self.site = mwclient.Site(site)
+    def __init__(self, site):
+        self.site = mwclient.Site(site)
 
-	def page(self, title):
-		content = self.site.pages[title].text()
-		return wikint.page.Page(title, content)
+    def page(self, title):
+        return wikint.core.page.Page(self, unicode(title))
