@@ -1,124 +1,93 @@
 import mwparserfromhell
-import wikint.assets
-import wikint.assets.company
+import wikint.core.section
 
 class PageNotFoundException(Exception):
+    '''Raised when a page can't be found'''
 
-    def __init__(self, title):
+    def __init__(self, page):
         self.page = page
         self.message = 'A page titled "{}" was not found'.format(page)
 
 
 class Page:
+    '''Class for extracting content from Wikipedia pages'''
 
     def __init__(self, site, title):
         content = site.site.pages[title].text()
         if not content: raise PageNotFoundException(title)
-        self.site = site
-        self.title = title
-        self.content = content
+        self.__site = site
+        self.__title = title
+        self.__content = content
         self.__code = ()
-        self.__nodes = ()
-        self.__templates = ()
-        self.__wikilinks = ()
-        self.__sections = ()
-        self.__lists = ()
-        self.__infobox = ()
-        self.__params = ()
         self.__kind = ()
+        self.__infobox = ()
+        self.__section = ()
         self.__asset = ()
 
     @property
+    def site(self):
+        '''Returns the site that this page belongs to'''
+        return self.__site
+
+    @property
+    def title(self):
+        '''Returns the title of the page'''
+        return self.__title
+
+    @property
+    def content(self):
+        '''Returns the text content of the page'''
+        return self.__content
+
+    @property
     def code(self):
+        '''Returns the parsed contents of the page'''
         if self.__code is ():
             self.__code = (mwparserfromhell.parse(self.content),)
         return self.__code[0]
 
     @property
-    def nodes(self):
-        if self.__nodes is ():
-            self.__nodes = (self.code.nodes,)
-        return self.__nodes[0]
-
-    @property
-    def templates(self):
-        if self.__templates is ():
-            self.__templates = (self.code.filter_templates(),)
-        return self.__templates[0]
-
-    @property
-    def wikilinks(self):
-        if self.__wikilinks is ():
-            self.__wikilinks = (self.code.filter_wikilinks(),)
-        return self.__wikilinks[0]        
-
-    @property
-    def sections(self):
-        if self.__sections is ():
-            sections = list()
-            self.__sections = (sections,)
-            current = None
-            for node in self.nodes:
-                if type(node) is mwparserfromhell.nodes.heading.Heading: 
-                    current = {
-                        'node': node,
-                        'content': list(),
-                    }
-                    sections.append(current)
-                elif current:
-                    current['content'].append(node)
-        return self.__sections[0]
-
-    @property
-    def lists(self):
-        if self.__lists is ():
-            lists = list()
-            self.__lists = (lists,)
-            for section in self.sections:
-                nodelist = list()
-                node = {
-                    'node': section['node'],
-                    'list': nodelist,
-                }
-                content = ''.join([unicode(c) for c in section['content']])
-                for line in content.split('\n'):
-                    line = line.strip()
-                    if line.startswith('*'):
-                        nodelist.append(mwparserfromhell.parse(line[1:].strip()))
-                lists.append(node)
-        return self.__lists[0]
-
-    @property
-    def infobox(self):
-        if self.__infobox is ():
-            self.__infobox = (None,)
-            for template in self.templates:
-                name = template.name.strip().split()
-                if name and name[0].lower() == 'infobox':
-                    self.__infobox = (template,)
-                    break
-        return self.__infobox[0]
-
-    @property
-    def params(self):
-        if self.__params is ():
-            params = list()
-            self.__params = (params,)
-            for param in self.infobox.params:
-                params.append(param.name.strip())                
-        return self.__params[0]
-
-    @property
     def kind(self):
+        '''Returns the entity kind discussed in the page'''
         if self.__kind is ():
-            self.__kind = (' '.join(self.infobox.name.strip().split()[1:]),)
+            self.__kind = self.infobox['__kind']
         return self.__kind[0]
 
     @property
-    def asset(self):
-        if self.__asset is ():
-            self.__asset = (None,)
-            for asset_kind in wikint.assets.MODULES:
-                if asset_kind.kind() == self.kind:
-                    self.__asset = (asset_kind.create(self),)
-        return self.__asset[0]
+    def infobox(self):
+        '''Returns the first infobox template on the page as a dict'''
+        if self.__infobox is ():
+            # Initialize property
+            infobox = dict()
+            self.__infobox = (infobox,)
+            # Go over the list of templates in the page
+            for node in self.code.filter_templates():
+                # Canonicalize the name and split by space
+                name = node.name.strip().split()
+                # Determine entity kind and include in infobox dict
+                infobox['__kind'] = name[1:]
+                # Handle ecnountered infobox template
+                if name and name[0].lower() == 'infobox':
+                    # Go over the infobox's parameters
+                    for param in node.params:
+                        # Extract infobox keys and values
+                        pname = param.name.strip()
+                        pvalue = param.value
+                        # Add to the infobox dictionary
+                        infobox[pname] = pvalue
+                    # Stop looking for another infobox
+                    break
+        # Return the infobox dictionary
+        return self.__infobox[0]
+
+    @property
+    def section(self):
+        '''Returns the page as a section object to allow traversal of
+        sections and subsections'''
+        if self.__section is ():
+            # Initialize property
+            section = wikint.core.section.Section(
+                    self, None, 0, self.title, self.content)
+            self.__section = (section,)
+        # Return sections and contents
+        return self.__section[0]

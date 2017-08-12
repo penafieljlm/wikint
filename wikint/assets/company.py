@@ -1,13 +1,6 @@
-import mwclient
 import mwparserfromhell
-import unidecode
+import wikint.assets.list
 import wikint.utils.text
-
-def kind():
-    return 'company'
-
-def create(page):
-    return Company(page)
 
 INFOBOX = {
     'website': [
@@ -20,41 +13,53 @@ INFOBOX = {
     ],
 }
 
-# TODO: research top 100 section names
-MISC_SECTIONS = [
-    'see also',
-    'references',
-    'external links',
-]
+class PageIsNotACompanyException(Exception):
+    '''Raised when an attempt is made to interpret the page as a company'''
+
+    def __init__(self, page):
+        self.page = page
+        self.message = 'The page "{}" is not a company'.format(page.title)
 
 # TODO: make this "Organization"
 # Make "organization" alias
 class Company:
+    '''Represents a company page'''
 
     def __init__(self, page):
-        self.page = page
+        # Ensure the page being interpreted is a list
+        if page.kind != 'company':
+            raise PageIsNotACompanyException(page)
+        # Initialize attributes
+        self.__page = page
         self.__name = ()
         self.__websites = ()
         self.__brands = ()
         self.__products = ()
 
     @property
+    def page(self):
+        '''Returns the page being wrapped'''
+        return self.__page
+
+    @property
     def name(self):
+        '''Returns the name of the company'''
         if self.__name is ():
             self.__name = (None,)
-            if 'name' in self.page.params:
-                self.__name = (self.page.infobox.get('name').value,)
+            if 'name' in self.page.infobox.keys():
+                self.__name = (self.page.infobox['name'].value,)
         return self.__name[0]
 
     @property
     def websites(self):
+        '''Returns the list of websites of the company'''
         if self.__websites is ():
             websites = set()
             self.__websites = (websites,)
             for name in INFOBOX['website']:
-                if name in self.page.params:
+                if name in self.page.infobox.keys():
                     value = mwparserfromhell.parse(
-                        self.page.infobox.get(name).value.strip())
+                        self.page.infobox[name].value.strip())
                     for node in value.nodes:
                         if type(node) is mwparserfromhell.nodes.text.Text:
                             websites.update(wikint.utils.text.extract_domains(unicode(node)))
@@ -65,36 +70,32 @@ class Company:
 
     @property
     def brands(self):
+        '''Returns the list of products and brands of the company'''
         if self.__brands is ():
+            # Inspect the infobox for aliases of "brands"
             brands = set()
-            self.__brands = (brands,)
             for name in INFOBOX['brands']:
-                if name in self.page.params:
+                # If the page's infobox contains the current alias
+                if name in self.page.infobox.keys():
+                    # Extract its value
                     value = mwparserfromhell.parse(
-                        self.page.infobox.get(name).value.strip())
+                        self.page.infobox[name].strip())
+                    # And iterate over the nodes
                     for node in value.nodes:
+                        # If we encounter a wikilink
                         if type(node) is mwparserfromhell.nodes.wikilink.Wikilink:
+                            # It's probably a list page
                             page = self.page.site.page(node.title)
-                            for section in page.lists:
-                                if not section['node'].title.strip().lower() in MISC_SECTIONS:
-                                    for item in section['list']:
-                                        itemwords = list()
-                                        for itemnode in item.nodes:
-                                            if type(itemnode) is mwparserfromhell.nodes.text.Text:
-                                                itemwords.append(unicode(itemnode).strip())
-                                            elif type(itemnode) is mwparserfromhell.nodes.wikilink.Wikilink:
-                                                itemwords.append(unicode(itemnode.title).strip())
-                                            elif type(itemnode) is mwparserfromhell.nodes.template.Template:
-                                                itemname = itemnode.name.strip().lower().split()
-                                                if itemname and itemname[0] == 'anchor':
-                                                    if itemnode.params:
-                                                        itemwords.append(unicode(itemnode.params[0]).strip())
-                                        itemtext = unidecode.unidecode(' '.join(itemwords).strip().split('.')[0])
-                                        # TODO: filter second-level lists
-                                        # TODO: get first noun of item
-                                        # TODO: create list handler class
-                                        # TODO: List(page)
-                                        brands.add(itemtext)
+                            try:
+                                # Parse as a list page and extract elements
+                                for e in wikint.assets.list.List(page).elements:
+                                    brands.add(e)
+                            except wikint.assets.list.PageIsNotAListException:
+                                # Pass if the page is not a list page
+                                pass
+            # Initialize the property
+            self.__brands = (list(brands),)
+        # Return the list of brands
         return self.__brands[0]
 
     @property
