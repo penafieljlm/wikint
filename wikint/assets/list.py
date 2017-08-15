@@ -1,3 +1,6 @@
+import re
+import nltk
+
 # TODO: research top 100 section names
 # https://en.wikipedia.org/wiki/Wikipedia:Manual_of_Style/Layout
 
@@ -46,11 +49,23 @@ class List:
                     continue
                 # Iterate over the section's bullets
                 for bullet in section.bullets:
-                    # Extract the first sentence in the bullet
-                    sentence = bullet.text.split('.')[0]
-                    # TODO: extract the first proper noun
-                    element = sentence
+                    # Extract the bullet's contents
+                    text = bullet.text.split('. ')[0].strip()
+                    # Extract named entities from the bullet
+                    tokens = nltk.word_tokenize(text)
+                    tags = nltk.pos_tag(tokens)
+                    chunks = nltk.ne_chunk(tags)
+                    # Extract the first named entity
+                    entity = list()
+                    for chunk in chunks.leaves():
+                        data, tag = chunk
+                        if tag == 'NNP':
+                            entity.append(data)
+                        else:
+                            break
+                    entity = ' '.join(entity)
                     # Append the element in the list
+                    element = entity
                     elements.append(element)
         # Return the elements
         return self.__elements[0]

@@ -102,7 +102,8 @@ RE_DOMAIN = re.compile(
     r')?'
 )
 
-def extract_domains(text):
+def domains(text):
+    '''Extracts domain names from a corpus of text'''
     domains = set()
     for domain in RE_DOMAIN.findall(text):
         if tld.get_tld('http://{}'.format(domain)):

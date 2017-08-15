@@ -62,10 +62,10 @@ class Company:
                         self.page.infobox[name].value.strip())
                     for node in value.nodes:
                         if type(node) is mwparserfromhell.nodes.text.Text:
-                            websites.update(wikint.utils.text.extract_domains(unicode(node)))
+                            websites.update(wikint.utils.text.domains(unicode(node)))
                         elif type(node) is mwparserfromhell.nodes.template.Template:
                             if node.name == 'URL' and node.params:
-                                websites.update(wikint.utils.text.extract_domains(unicode(node.params[0])))
+                                websites.update(wikint.utils.text.domains(unicode(node.params[0])))
         return self.__websites[0]
 
     @property
@@ -93,8 +93,10 @@ class Company:
                             except wikint.assets.list.PageIsNotAListException:
                                 # Pass if the page is not a list page
                                 pass
+                            # TODO: handle direct links to product articles
             # Initialize the property
             self.__brands = (list(brands),)
+        # TODO: look for products section in main article
         # Return the list of brands
         return self.__brands[0]
 

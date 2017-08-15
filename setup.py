@@ -13,6 +13,8 @@ config = {
     'install_requires': [
         'mwclient',
         'mwparserfromhell',
+        'nltk',
+        'numpy',
         'tld',
         'unidecode',
     ],
